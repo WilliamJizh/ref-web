@@ -9,7 +9,7 @@ import {
 
 
 export const RefTable = pgTable(
-  "references",
+  "References",
   {
     id: serial("id").primaryKey(),
     userId: text("userId").notNull(),
