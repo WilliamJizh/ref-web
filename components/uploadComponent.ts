@@ -1,9 +1,9 @@
 "use client";
 
-import { NodeData } from "@/types/types";
 import { upload } from "@vercel/blob/client";
 import { v4 as uuidv4 } from "uuid";
 import { createReference, modifyReference } from "../actions/handleReferences";
+import { NodeData } from "@/types/types";
 
 const base64ToBlob = (base64: string) => {
   const byteString = atob(base64.split(",")[1]);
@@ -21,36 +21,38 @@ export const handleUpload = async (
   referenceId: number,
   user: { id: string } | null
 ) => {
+  console.log("referenceId", referenceId);
+
   if (!user) {
     throw new Error("User not found");
   }
 
-  for (const node of nodeData) {
-    console.log("node image", node.data.image);
-    if (node.data.image.startsWith("data:")) {
-      const imageName = `${user.id}/${uuidv4()}`;
-      const image = base64ToBlob(node.data.image);
-      const vercelBlobItem = await upload(imageName, image, {
-        access: "public",
-        handleUploadUrl: "/api/image/upload",
-      }).catch((error) => {
-        console.error("Error uploading image", error);
-        throw new Error("Error uploading image");
-      });
-
-      // TODO: wait for cdn implementation
-      if (vercelBlobItem) {
+  await Promise.all(
+    nodeData.map(async (node) => {
+      if (node.data.image.startsWith("data:")) {
+        const imageName = `${user.id}/${uuidv4()}`;
+        const image = base64ToBlob(node.data.image);
+        const vercelBlobItem = await upload(imageName, image, {
+          access: "public",
+          handleUploadUrl: "/api/image/upload",
+        }).catch((error) => {
+          console.error("Error uploading image", error);
+          throw new Error("Error uploading image");
+        });
         node.data.image = vercelBlobItem.url;
       }
-    }
-  }
+    })
+  );
 
   console.log("nodeData", nodeData);
 
   if (referenceId === -1) {
-    return createReference(nodeData, user.id);
+    console.log("creating reference");
+    return await createReference(nodeData, user.id);
   }
 
-  return modifyReference(referenceId, nodeData);
-
+  return modifyReference(referenceId, nodeData).catch((error) => {
+    console.error("Error modifying reference", error);
+    throw new Error("Error modifying reference");
+  });
 };

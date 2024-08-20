@@ -14,7 +14,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 
 import { getReferences } from "@/actions/handleReferences";
-import { NodeData } from "@/types/types";
+import { ImageNodeData, NodeData } from "@/types/types";
 import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
 import "@xyflow/react/dist/style.css";
 import { extractColors } from "extract-colors";
@@ -23,7 +23,7 @@ import CornerControl from "./cornerControl";
 import ImageNode from "./imageNode";
 import { handleUpload } from "./uploadComponent";
 import { useToast } from "./ui/use-toast";
-
+import { Button } from "./ui/button";
 
 const FlowCanvas: React.FC = () => {
   const { user } = useKindeBrowserClient();
@@ -33,45 +33,33 @@ const FlowCanvas: React.FC = () => {
     useReactFlow();
   const nodeTypes = useMemo(() => ({ imageNode: ImageNode }), []);
   const { toast } = useToast();
+
+  console.log(nodes);
   useEffect(() => {
     const fetchReferences = async () => {
       if (user) {
         const references = await getReferences(user.id);
-        console.log(references);
-        setReferenceId(references[0].id);
-        setNodes(references[0].data as NodeData[]);
+        setReferenceId(references[0]?.id || -1);
+        setNodes((references[0]?.data as NodeData[]) || []);
       }
     };
     fetchReferences();
   }, [setNodes, user]);
 
-  const alignImages = async (
+  const loadImages = async (
     images: FileList,
     event: React.DragEvent
   ): Promise<NodeData[]> => {
-    const nodes: NodeData[] = [];
-
-    const viewport = getViewport();
-    console.log("viewport", viewport);
-
-    const { x: correctX, y: correctY } = screenToFlowPosition({
+    const { x: dropFlowPosX, y: dropFlowPosY } = screenToFlowPosition({
       x: event.clientX,
       y: event.clientY,
     });
 
-    console.log("correctX", correctX);
-    console.log("correctY", correctY);
-
     // Load all images and sort by area (width * height) descending
-    const loadedImages = await Promise.all(
+    const loadedImages: ImageNodeData[] = await Promise.all(
       Array.from(images).map(
         (image) =>
-          new Promise<{
-            src: string;
-            width: number;
-            height: number;
-            colors: any[];
-          }>((resolve, reject) => {
+          new Promise<ImageNodeData>((resolve, reject) => {
             if (typeof image === "string") {
               // Handle URL
               const img = new Image();
@@ -81,7 +69,7 @@ const FlowCanvas: React.FC = () => {
               img.onload = async () => {
                 const colors = await extractColors(image);
                 resolve({
-                  src: image,
+                  image: image,
                   width: img.width,
                   height: img.height,
                   colors: colors,
@@ -107,7 +95,7 @@ const FlowCanvas: React.FC = () => {
                 const colors = await extractColors(result);
 
                 resolve({
-                  src: result,
+                  image: result,
                   width: imageLoaded.width,
                   height: imageLoaded.height,
                   colors: colors,
@@ -122,51 +110,39 @@ const FlowCanvas: React.FC = () => {
           })
       )
     );
+    // Sort
+    const sortedImages = loadedImages.sort(
+      (a, b) => b.width * b.height - a.width * a.height
+    );
 
-    // Sort images by height descending
-    const sortedImages = loadedImages.sort((a, b) => b.height - a.height);
-    const firstImageCenterX = sortedImages[0].width / 2;
-    const firstImageCenterY = sortedImages[0].height / 2;
-
-    const maxWidth = 10000;
-    let hightestImage = sortedImages[0].height;
-    let currWidth = 0;
-    let currHeight = 0;
-
-    for (const img of sortedImages) {
-      nodes.push({
+    // Align images horizontally
+    let lastWidth = 0;
+    let updatedNodes: NodeData[] = [];
+    const firstImage = sortedImages[0];
+    const correctX = dropFlowPosX - firstImage.width / 2;
+    const correctY = dropFlowPosY - firstImage.height / 2;
+    sortedImages.forEach((image) => {
+      updatedNodes.push({
         id: uuidv4(),
         position: {
-          x: correctX - firstImageCenterX + currWidth,
-          y: correctY - firstImageCenterY + currHeight,
+          x: correctX + lastWidth,
+          y: correctY,
         },
+        data: image,
         type: "imageNode",
-        data: {
-          image: img.src,
-          colors: img.colors,
-          height: img.height,
-          width: img.width,
-        },
       });
-      currWidth += img.width;
-      if (currWidth + img.width > maxWidth) {
-        currWidth = 0;
-        currHeight += hightestImage;
-        hightestImage = img.height;
-      }
-    }
+      lastWidth += image.width;
+    });
 
-    return nodes;
+    return updatedNodes;
   };
-
-  
 
   const onDrop = useCallback(async (event: React.DragEvent) => {
     event.preventDefault();
     const files = event.dataTransfer.files;
     if (!files.length) return;
 
-    const nodes = await alignImages(files, event);
+    const nodes = await loadImages(files, event);
 
     setNodes((currNodes) => currNodes.concat(nodes as never[]));
   }, []);
@@ -189,7 +165,7 @@ const FlowCanvas: React.FC = () => {
 
   return (
     <div
-      className="h-full w-full bg-red-500"
+      className="h-full w-full"
       onDragOver={(event) => event.preventDefault()}
       onDrop={onDrop}
     >
@@ -201,23 +177,40 @@ const FlowCanvas: React.FC = () => {
         nodes={nodes}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
-        panOnScroll
         selectionOnDrag
         panOnDrag={[1]}
         selectionMode={SelectionMode.Partial}
         fitView
-        minZoom={0.1}
+        minZoom={0.01}
+        maxZoom={10}
       >
-        <Controls showZoom={false} showFitView={false} showInteractive={false}>
-          <ControlButton onClick={() => zoomIn()} className="bg-background">
+        <Controls
+          showZoom={false}
+          showFitView={false}
+          showInteractive={false}
+          className="bg-background border rounded-md p-2 gap-2"
+        >
+          <Button
+            variant="outline"
+            onClick={() => zoomIn()}
+            className="bg-background w-fit h-fit p-2"
+          >
             <Plus />
-          </ControlButton>
-          <ControlButton onClick={() => zoomOut()} className="bg-background">
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => zoomOut()}
+            className="bg-background w-fit h-fit p-2"
+          >
             <Minus />
-          </ControlButton>
-          <ControlButton onClick={() => fitView()} className="bg-background">
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => fitView()}
+            className="bg-background w-fit h-fit p-2"
+          >
             <Maximize />
-          </ControlButton>
+          </Button>
         </Controls>
         <Background />
         <MiniMap />

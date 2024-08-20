@@ -28,6 +28,7 @@ function ImageNode({ data, selected }: { data: ImageNodeData; selected?: boolean
           minWidth={100}
           minHeight={100}
           onResizeEnd={(data) => {
+            console.log('resized', data);
             setWidth(data.subject.x);
             setHeight(data.subject.y);
           }}
