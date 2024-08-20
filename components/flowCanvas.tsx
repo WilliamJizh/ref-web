@@ -70,8 +70,8 @@ const FlowCanvas: React.FC = () => {
                 const colors = await extractColors(image);
                 resolve({
                   image: image,
-                  width: img.width,
-                  height: img.height,
+                  originalWidth: img.width,
+                  originalHeight: img.height,
                   colors: colors,
                 });
               };
@@ -96,8 +96,8 @@ const FlowCanvas: React.FC = () => {
 
                 resolve({
                   image: result,
-                  width: imageLoaded.width,
-                  height: imageLoaded.height,
+                  originalWidth: imageLoaded.width,
+                  originalHeight: imageLoaded.height,
                   colors: colors,
                 });
               };
@@ -112,15 +112,15 @@ const FlowCanvas: React.FC = () => {
     );
     // Sort
     const sortedImages = loadedImages.sort(
-      (a, b) => b.width * b.height - a.width * a.height
+      (a, b) => b.originalWidth * b.originalHeight - a.originalWidth * a.originalHeight
     );
 
     // Align images horizontally
     let lastWidth = 0;
     let updatedNodes: NodeData[] = [];
     const firstImage = sortedImages[0];
-    const correctX = dropFlowPosX - firstImage.width / 2;
-    const correctY = dropFlowPosY - firstImage.height / 2;
+    const correctX = dropFlowPosX - firstImage.originalWidth / 2;
+    const correctY = dropFlowPosY - firstImage.originalHeight / 2;
     sortedImages.forEach((image) => {
       updatedNodes.push({
         id: uuidv4(),
@@ -130,8 +130,10 @@ const FlowCanvas: React.FC = () => {
         },
         data: image,
         type: "imageNode",
+        width: image.originalWidth,
+        height: image.originalHeight,
       });
-      lastWidth += image.width;
+      lastWidth += image.originalWidth;
     });
 
     return updatedNodes;

@@ -1,15 +1,18 @@
-"use client"
+"use client";
 
 import { ImageNodeData } from "@/types/types";
 import { NodeResizer } from "@xyflow/react";
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-function ImageNode({ data, selected }: { data: ImageNodeData; selected?: boolean }) {
-  const [width, setWidth] = useState(data.width); // Initial width
-  const [height, setHeight] = useState(data.height); // Initial height
+function ImageNode({
+  data,
+  selected,
+}: {
+  data: ImageNodeData;
+  selected?: boolean;
+}) {
   const nodeRef = useRef(null);
-
 
   return (
     <>
@@ -27,19 +30,13 @@ function ImageNode({ data, selected }: { data: ImageNodeData; selected?: boolean
           }}
           minWidth={100}
           minHeight={100}
-          onResizeEnd={(data) => {
-            console.log('resized', data);
-            setWidth(data.subject.x);
-            setHeight(data.subject.y);
-          }}
         />
         <div>
           <Image
             ref={nodeRef}
             src={data.image}
             alt="image"
-            width={width}
-            height={height}
+            fill
             className="w-full h-full"
           />
         </div>

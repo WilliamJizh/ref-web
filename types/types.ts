@@ -1,13 +1,12 @@
+import { Node } from "@xyflow/react";
+
 export type ImageNodeData = {
   image: string;
   colors: { hex: string }[];
-  height: number;
-  width: number;
+  originalHeight: number;
+  originalWidth: number;
 };
 
-export type NodeData = {
-  id: string;
-  position: { x: number; y: number };
-  type: "imageNode";
+export type NodeData = Node & {
   data: ImageNodeData;
 };
