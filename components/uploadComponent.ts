@@ -39,12 +39,11 @@ export const handleUpload = async (
           console.error("Error uploading image", error);
           throw new Error("Error uploading image");
         });
-        node.data.image = vercelBlobItem.url;
+        node.data.image = cdnReplacement(vercelBlobItem.url);
+
       }
     })
   );
-
-  console.log("nodeData", nodeData);
 
   if (referenceId === -1) {
     console.log("creating reference");
@@ -55,4 +54,13 @@ export const handleUpload = async (
     console.error("Error modifying reference", error);
     throw new Error("Error modifying reference");
   });
+};
+
+const cdnReplacement = (image: string) => {
+  console.log(process.env.NEXT_PUBLIC_VERCEL_BLOB_URL);
+  console.log(process.env.NEXT_PUBLIC_TWICPICS_DOMAIN);
+  return image.replace(
+    process.env.NEXT_PUBLIC_VERCEL_BLOB_URL || "",
+    process.env.NEXT_PUBLIC_TWICPICS_DOMAIN || ""
+  );
 };
